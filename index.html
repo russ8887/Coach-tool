@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Coach Schedule Tool</title>
+
+    <link href="./dist/output.css" rel="stylesheet">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='15' fill='%2322c55e'/%3E%3Cpath fill='%23ef4444' d='M25 75 L 25 40 L 40 55 L 50 35 L 60 55 L 75 40 L 75 75 Z'/%3E%3C/svg%3E" type="image/svg+xml">
+
+    <style>
+        /* Tailwind's hidden class for general use */
+        .hidden { display: none !important; }
+
+        /* Loading spinner styles */
+        #log-viewer-loading, #modal-loading-indicator, #class-modal-loading-indicator { /* Added class modal loading */
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: #4f46e5; /* Indigo */
+            animation: spin-log 1s ease infinite;
+        }
+        html.dark #log-viewer-loading, html.dark #modal-loading-indicator, html.dark #class-modal-loading-indicator { /* Added class modal loading */
+            border-left-color: #a5b4fc; /* Indigo lighter */
+        }
+        @keyframes spin-log { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Gradient background */
+        .gradient-bg { background: linear-gradient(to right bottom, #6366f1, #8b5cf6, #ec4899); }
+
+        /* Quote visibility transition */
+        #chess-quote, #main-chess-quote { transition: opacity 0.5s ease-in-out; opacity: 0; }
+        #chess-quote.visible, #main-chess-quote.visible { opacity: 1; }
+
+        /* Error message transition */
+        #general-error-message { transition: opacity 0.3s ease-in-out; }
+        /* Missed log warning transition */
+        #missed-log-warning { transition: opacity 0.3s ease-in-out; }
+
+        /* Manual add list item styling */
+        #manual-add-results li, #roster-add-results li { @apply flex justify-between items-center py-1 border-b border-gray-200; @apply dark:border-gray-600; }
+        #manual-add-results li:last-child, #roster-add-results li:last-child { @apply border-b-0; }
+        #manual-add-results button, #roster-add-results button { @apply text-xs bg-blue-500 hover:bg-blue-700 text-white font-semibold py-0.5 px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ml-2 flex-shrink-0; @apply dark:bg-blue-600 dark:hover:bg-blue-500; }
+        #manual-add-results button:disabled, #roster-add-results button:disabled { @apply bg-gray-400 cursor-not-allowed; @apply dark:bg-gray-500; }
+
+        /* Log viewer entry styling */
+        .log-entry { @apply border-b border-gray-200 dark:border-gray-700 pb-3 pt-2 px-2 hover:bg-gray-50 dark:hover:bg-gray-700/60 rounded transition duration-150 ease-in-out; }
+        .log-entry:last-child { @apply border-b-0 pb-2; }
+
+        /* Style for student status list items */
+        #admin-student-status-list li { @apply flex justify-between items-center py-1.5 px-2 border-b border-purple-100 dark:border-purple-800 last:border-b-0; }
+        #admin-student-status-list button { @apply text-xs font-semibold py-0.5 px-2 rounded focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-gray-800 transition-colors duration-150; }
+        #admin-student-status-list button.status-active { @apply bg-red-500 hover:bg-red-700 text-white focus:ring-red-600; }
+        #admin-student-status-list button.status-inactive { @apply bg-green-500 hover:bg-green-700 text-white focus:ring-green-600; }
+        #admin-student-status-list button:disabled { @apply bg-gray-400 cursor-not-allowed opacity-70; }
+
+        /* Styling for ad-hoc student search results */
+        #adhoc-log-student-search-results li { @apply flex justify-between items-center py-1 px-2 border-b border-gray-200 dark:border-gray-600 last:border-b-0; }
+        #adhoc-log-student-search-results button { @apply text-xs bg-blue-500 hover:bg-blue-700 text-white font-semibold py-0.5 px-1.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ml-2 flex-shrink-0; @apply dark:bg-blue-600 dark:hover:bg-blue-500; }
+        #adhoc-log-selected-students-list .remove-adhoc-student-btn { @apply text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs ml-2; }
+
+        /* Student Profile Modal Styling - Full Page Overlay */
+        #student-profile-modal {
+            display: none; /* Controlled by JS */
+            position: fixed;
+            inset: 0;
+            z-index: 1000; /* High z-index */
+            background-color: white; /* Solid background */
+            overflow-y: auto; /* Allow scrolling */
+            opacity: 0; /* Start transparent for fade-in */
+            transition: opacity 0.3s ease-in-out;
+        }
+        html.dark #student-profile-modal {
+            background-color: #1f2937; /* Tailwind gray-800 */
+        }
+        #student-profile-modal.is-open {
+            opacity: 1; /* Fade in */
+        }
+        /* Style for the absolutely positioned close button */
+        #modal-close-button {
+            /* Increased z-index, adjusted background opacity, added border */
+            @apply absolute top-4 right-4 z-50; /* Position top-right, ABOVE content */
+            /* Removed text color, using emoji color */
+            /* More opaque background + border */
+            @apply bg-white/90 dark:bg-gray-700/90 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600;
+            /* Adjusted padding for emoji */
+            @apply p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;
+            transition: background-color 0.15s ease-in-out;
+            @apply shadow;
+             /* Ensure emoji is centered */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem; /* Adjust size as needed */
+            height: 2rem; /* Adjust size as needed */
+        }
+        #modal-close-button span {
+             font-size: 1rem; /* Adjust emoji size */
+             line-height: 1; /* Prevent extra space */
+        }
+
+        /* --- Class View Modal Styling --- */
+        #class-view-modal {
+            display: none; /* Controlled by JS */
+            position: fixed;
+            inset: 0;
+            z-index: 1000; /* Same z-index as student profile */
+            background-color: white;
+            overflow-y: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        html.dark #class-view-modal {
+            background-color: #1f2937; /* Tailwind gray-800 */
+        }
+        #class-view-modal.is-open {
+            opacity: 1;
+        }
+        /* Style for the class modal close button */
+        #class-modal-close-button {
+            @apply absolute top-4 right-4 z-50;
+            @apply bg-white/90 dark:bg-gray-700/90 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600;
+            @apply p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;
+            transition: background-color 0.15s ease-in-out;
+            @apply shadow;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+        }
+        #class-modal-close-button span {
+             font-size: 1rem;
+             line-height: 1;
+        }
+        /* Styling for student list within class modal */
+        #class-modal-student-list li {
+            @apply flex flex-col sm:flex-row sm:justify-between sm:items-start py-2 px-2 border-b border-gray-200 dark:border-gray-600 last:border-b-0;
+        }
+        #class-modal-student-list .student-name {
+             @apply text-sm font-semibold text-gray-800 dark:text-gray-100; /* Made name bold */
+        }
+        #class-modal-student-list .student-status {
+             @apply text-xs font-medium px-2 py-0.5 rounded-full;
+        }
+        #class-modal-student-list .status-active {
+             @apply bg-green-100 text-green-800 dark:bg-green-800/40 dark:text-green-200;
+        }
+        #class-modal-student-list .status-inactive {
+             @apply bg-red-100 text-red-800 dark:bg-red-800/40 dark:text-red-200;
+        }
+        /* Styling for availability display */
+        #class-modal-availability-display .availability-day {
+            @apply capitalize font-medium w-16 inline-block text-gray-600 dark:text-gray-400;
+        }
+        #class-modal-availability-display .availability-times {
+            @apply text-gray-800 dark:text-gray-200;
+        }
+        /* --- END Class View Modal Styling --- */
+
+    </style>
+
+    <script>
+         // Immediately sets theme based on preference/OS to prevent FOUC
+         (function() {
+            const theme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (theme === 'dark' || (!theme && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            console.log("Initial theme set based on preference/OS.");
+         })();
+     </script>
+</head>
+<body class="bg-gray-100 font-sans dark:bg-gray-900 dark:text-gray-200">
+
+    <section id="login-section" class="flex items-center justify-center min-h-screen gradient-bg px-4">
+        <div class="w-full max-w-md bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
+            <h2 class="text-2xl font-bold text-center text-gray-800 dark:text-gray-100 mb-6">Coach Login</h2>
+            <p id="chess-quote" class="text-center text-sm italic text-gray-500 dark:text-gray-400 mb-6 h-8"></p>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="email" class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="email" name="email" required
+                           autocomplete="username"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                           placeholder="your.email@example.com">
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Password</label>
+                    <input type="password" id="password" name="password" required
+                           autocomplete="current-password"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                           placeholder="******************">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <button type="submit" id="login-button"
+                            class="bg-indigo-500 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                        Sign In
+                    </button>
+                </div>
+                 <p id="login-error-message" class="text-red-500 dark:text-red-400 text-xs italic text-center mb-4 h-4"></p>
+                 <div class="text-center">
+                     <a href="#" id="forgot-password-link" class="inline-block align-baseline font-bold text-sm text-indigo-500 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">
+                         Forgot Password?
+                     </a>
+                 </div>
+            </form>
+        </div>
+    </section>
+
+    <section id="password-reset-section" class="hidden flex items-center justify-center min-h-screen gradient-bg px-4">
+        <div class="w-full max-w-md bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
+            <h2 class="text-2xl font-bold text-center text-gray-800 dark:text-gray-100 mb-6">Password Reset</h2>
+            <form id="password-reset-form" class="hidden">
+                <p class="text-gray-600 dark:text-gray-300 text-sm mb-4">Enter your new password below.</p>
+                <div class="mb-4">
+                    <label for="new-password" class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">New Password</label>
+                    <input type="password" id="new-password" name="new-password" required
+                           autocomplete="new-password"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                           placeholder="Enter new password">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <button type="submit" id="update-password-button"
+                            class="bg-indigo-500 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                        Update Password
+                    </button>
+                </div>
+            </form>
+            <form id="forgot-password-form">
+                 <p class="text-gray-600 dark:text-gray-300 text-sm mb-4">Enter your email address and we'll send you a link to reset your password.</p>
+                 <div class="mb-4">
+                     <label for="reset-email" class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Email</label>
+                     <input type="email" id="reset-email" name="reset-email" required
+                            autocomplete="username"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            placeholder="your.email@example.com">
+                 </div>
+                 <div class="flex items-center justify-between mb-4">
+                     <button type="submit" id="send-reset-link-button"
+                             class="bg-indigo-500 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">
+                         Send Reset Link
+                     </button>
+                 </div>
+             </form>
+             <p id="password-reset-message" class="text-center text-sm mt-4 h-4"></p>
+             <div class="text-center mt-4">
+                  <a href="#" id="back-to-login-link" onclick="window.location.hash=''; window.location.reload(); return false;" class="inline-block align-baseline font-bold text-sm text-indigo-500 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">
+                      &larr; Back to Login
+                  </a>
+              </div>
+        </div>
+    </section>
+
+    <section id="app-section" class="hidden container mx-auto p-4 dark:bg-gray-900">
+        <header class="flex flex-wrap items-center justify-between mb-6 pb-4 border-b border-gray-300 dark:border-gray-600 gap-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                Chess Coach Schedule
+                <span id="admin-badge" class="hidden ml-2 text-xs bg-purple-200 text-purple-800 dark:bg-purple-900 dark:text-purple-300 font-semibold px-2.5 py-0.5 rounded-full">Admin</span>
+            </h1>
+            <div class="flex items-center space-x-3">
+                 <button id="theme-toggle" title="Toggle light/dark theme"
+                         class="p-2 rounded-md text-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900">
+                     <span id="theme-emoji-container">🌙</span> </button>
+                 <button id="logout-button" title="Logout"
+                         class="p-2 rounded-md text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/50 dark:hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-900">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                         <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
+                     </svg>
+                 </button>
+            </div>
+        </header>
+
+        <div id="general-error-message" class="hidden bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded relative mb-4" role="alert">
+            <strong class="font-bold">Error: </strong>
+            <span id="general-error-text" class="block sm:inline">Something went wrong.</span>
+        </div>
+
+        <div id="date-term-info" class="text-center text-sm text-gray-600 dark:text-gray-400 mb-4"></div>
+
+        <div id="main-quote-section" class="text-center text-sm italic text-gray-500 dark:text-gray-400 mb-6 h-8">
+             <p id="main-chess-quote"></p>
+        </div>
+
+        <div id="missed-log-warning" class="hidden border px-4 py-3 rounded relative mb-4 text-sm" role="alert">
+            <strong class="font-bold">Warning: </strong>
+            <span id="missed-log-warning-text" class="block sm:inline">You have missed log entries.</span>
+        </div>
+
+        <div id="coach-selector-container" class="mb-6 hidden">
+            <label for="coach-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Coach:</label>
+            <select id="coach-select" name="coach-select"
+                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                <option value="">-- Select a Coach --</option>
+                </select>
+        </div>
+
+        <div id="schedule-display" class="hidden mb-6">
+            <div id="day-view-toggle-buttons" class="flex justify-center space-x-2 mb-4">
+                 <button data-view="Week" class="day-toggle-button px-3 py-1 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200 focus:ring-indigo-500 active">Week</button>
+                 <button data-view="Monday" class="day-toggle-button px-3 py-1 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 focus:ring-gray-400">Mon</button>
+                 <button data-view="Tuesday" class="day-toggle-button px-3 py-1 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 focus:ring-gray-400">Tue</button>
+                 <button data-view="Wednesday" class="day-toggle-button px-3 py-1 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 focus:ring-gray-400">Wed</button>
+                 <button data-view="Thursday" class="day-toggle-button px-3 py-1 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 focus:ring-gray-400">Thu</button>
+                 <button data-view="Friday" class="day-toggle-button px-3 py-1 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 focus:ring-gray-400">Fri</button>
+            </div>
+            <div id="coach-schedule" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                 </div>
+            <div id="slot-actions" class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg shadow hidden flex flex-col sm:flex-row items-start sm:items-center justify-center gap-3">
+                 <button id="find-students-button" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-1.5 px-3 rounded text-sm focus:outline-none focus:shadow-outline hidden">
+                    Find Fill-in Suggestions
+                 </button>
+                 <button id="manual-add-student-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 px-3 rounded text-sm focus:outline-none focus:shadow-outline hidden">
+                    Manually Add Student
+                 </button>
+                 <div id="manual-add-container" class="hidden w-full max-w-sm p-3 bg-white dark:bg-gray-700 rounded-md shadow-inner border border-gray-200 dark:border-gray-600">
+                     <label for="manual-student-search" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Search Available Student:</label>
+                     <input type="text" id="manual-student-search" placeholder="Type name..." class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 mb-2 focus:ring-indigo-500 focus:border-indigo-500">
+                     <div id="manual-add-results" class="text-sm max-h-40 overflow-y-auto">
+                         </div>
+                     <p id="manual-add-error" class="text-red-500 dark:text-red-400 text-xs mt-1 hidden"></p>
+                 </div>
+            </div>
+            <div id="roster-add-container" class="hidden mt-4 p-3 bg-amber-100 dark:bg-amber-800/50 rounded-lg shadow w-full max-w-sm mx-auto border border-amber-300 dark:border-amber-600">
+                 <h4 id="roster-add-title" class="text-sm font-semibold text-amber-800 dark:text-amber-100 mb-2">Add Student to Slot</h4>
+                 <label for="roster-student-search" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Search Student:</label>
+                 <input type="text" id="roster-student-search" placeholder="Type name..." class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 mb-2 focus:ring-indigo-500 focus:border-indigo-500">
+                 <div id="roster-add-results" class="text-sm max-h-60 overflow-y-auto">
+                     </div>
+                 <p id="roster-add-error" class="text-red-600 dark:text-red-400 text-xs mt-1 hidden"></p>
+                 <button id="roster-add-cancel-button" type="button" class="mt-2 text-xs text-gray-600 dark:text-gray-400 hover:underline">Cancel</button>
+            </div>
+        </div>
+
+        <section id="past-missed-logs-section" class="hidden mb-6 p-4 border border-orange-300 dark:border-orange-600 rounded-lg bg-orange-50 dark:bg-orange-900/30 shadow">
+            <h3 class="text-lg font-semibold text-orange-800 dark:text-orange-200 mb-3">Past Missed Logs</h3>
+            <div id="past-missed-logs-output" class="max-h-96 overflow-y-auto">
+                <p class="text-sm text-gray-500 dark:text-gray-400 italic">Loading past missed logs...</p>
+            </div>
+        </section>
+
+        <section id="log-viewer-section" class="mb-6">
+            <button id="view-past-logs-button" class="inline-flex items-center space-x-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium mb-4 text-sm focus:outline-none focus:underline">
+                <span>📜</span> <span>View Past Lesson Logs</span>
+                <span>&rarr;</span>
+            </button>
+            <div id="log-viewer-container" class="hidden p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/50 shadow">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">Lesson Log Viewer</h3>
+                <div id="log-viewer-controls" class="flex flex-wrap gap-4 items-center mb-4 pb-3 border-b dark:border-gray-600">
+                    <div>
+                        <label for="week-selector" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Week:</label>
+                        <select id="week-selector" class="text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Select Week --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="log-filter-student" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Student:</label>
+                        <select id="log-filter-student" class="text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">All Students</option>
+                            </select>
+                    </div>
+                    <div class="flex items-center space-x-1 mt-4 sm:mt-0">
+                        <span class="text-xs font-medium text-gray-700 dark:text-gray-300 mr-1">Sort:</span>
+                        <button id="log-sort-date-desc" data-sort="date_desc" class="log-sort-button text-xs px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-gray-800 focus:ring-indigo-500 transition-colors duration-150">Date (Newest)</button>
+                        <button id="log-sort-date-asc" data-sort="date_asc" class="log-sort-button text-xs px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-gray-800 focus:ring-indigo-500 transition-colors duration-150">Date (Oldest)</button>
+                        <button id="log-sort-student" data-sort="student_asc" class="log-sort-button text-xs px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-offset-1 dark:focus:ring-offset-gray-800 focus:ring-indigo-500 transition-colors duration-150">Student (A-Z)</button>
+                    </div>
+                </div>
+                <div id="log-viewer-loading" class="hidden mx-auto my-4"></div> <div id="log-viewer-output" class="space-y-3 max-h-96 overflow-y-auto">
+                    <p class="text-gray-500 dark:text-gray-400 italic">Select a coach and week to view logs.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="admin-actions-section" class="hidden mb-6 p-4 border border-purple-300 dark:border-purple-700 rounded-lg bg-purple-50 dark:bg-purple-900/30 shadow">
+             <div class="flex justify-between items-center mb-3">
+                 <h3 class="text-lg font-semibold text-purple-800 dark:text-purple-200">Admin Tools</h3>
+                 <button id="admin-toggle-button" class="inline-flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 font-medium focus:outline-none focus:underline">
+                     <span>🛠️</span> <span>Hide Tools</span>
+                 </button>
+             </div>
+
+             <div id="admin-tools-content">
+                 <div class="mb-4">
+                     <button id="test-mode-button" title="Toggle Test Mode"
+                             class="inline-flex items-center space-x-1.5 text-sm font-medium px-3 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 mb-2">
+                         <span class="emoji">🧪</span> <span class="text">Test Mode</span> </button>
+                     <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Toggle between Live and Test data modes.</p>
+                 </div>
+                 <div class="mb-4 border-t border-purple-200 dark:border-purple-600 pt-4">
+                     <button id="toggle-edit-mode-button" class="inline-flex items-center space-x-1.5 bg-amber-500 hover:bg-amber-600 dark:hover:bg-amber-700 text-white font-bold py-1 px-3 rounded text-sm focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 dark:focus:ring-offset-gray-800">
+                         <span>✏️</span> <span>Enable Roster Editing</span>
+                     </button>
+                     <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Allows adding/removing students from schedule slots.</p>
+                 </div>
+                 <div class="mb-4 border-t border-purple-200 dark:border-purple-600 pt-4">
+                     <button id="clear-test-data-button" class="inline-flex items-center space-x-1.5 bg-red-500 hover:bg-red-700 dark:hover:bg-red-600 text-white font-bold py-1 px-3 rounded text-sm focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800" title="Only works when Test Mode is Active">
+                         <span>🗑️</span> <span>Clear All Test Data</span>
+                     </button>
+                     <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Deletes all entries from _test tables (attendance, logs).</p>
+                 </div>
+
+                 <div class="border-t border-purple-200 dark:border-purple-600 pt-4 mt-4">
+                    <h4 class="font-medium mb-2 text-purple-800 dark:text-purple-200">View Class Roster</h4>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                        Select a class to view its student list in a pop-up.
+                    </p>
+                    <div class="flex items-end gap-2">
+                        <div class="flex-grow">
+                            <label for="admin-class-select" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Class:</label>
+                            <select id="admin-class-select" class="text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500 w-full">
+                                <option value="">Select Class...</option>
+                                </select>
+                        </div>
+                        <button id="view-class-button" class="inline-flex items-center space-x-1.5 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded text-sm focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <span>👁️</span> <span>View</span>
+                        </button>
+                    </div>
+                    <p id="admin-class-select-error" class="text-red-500 dark:text-red-400 text-xs mt-1 hidden"></p>
+                 </div>
+
+                 <div class="border-t border-purple-200 dark:border-purple-600 pt-4 mt-4">
+                     <h4 class="font-medium mb-2 text-purple-800 dark:text-purple-200">Log Ad-hoc Past Session</h4>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                        Log a lesson that occurred on a past date but wasn't on the regular schedule (e.g., make-up class).
+                    </p>
+                    <form id="adhoc-past-log-form" class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="adhoc-log-date" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date*</label>
+                                <input type="date" id="adhoc-log-date" name="adhoc-log-date" required
+                                       class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label for="adhoc-log-time" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Time (HH:MM)*</label>
+                                <input type="time" id="adhoc-log-time" name="adhoc-log-time" required
+                                       class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="adhoc-log-coach" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Coach*</label>
+                                <select id="adhoc-log-coach" name="adhoc-log-coach" required
+                                        class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">Select Coach...</option>
+                                    </select>
+                            </div>
+                            <div>
+                                <label for="adhoc-log-lesson-type" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Lesson Type*</label>
+                                <select id="adhoc-log-lesson-type" name="adhoc-log-lesson-type" required
+                                        class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="Solo">Solo (1 student)</option>
+                                    <option value="Paired">Paired (Max 2 students)</option>
+                                    <option value="Group">Group (Max 3 students)</option>
+                                    </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Student(s)*</label>
+                            <div id="adhoc-log-student-selection-area" class="p-2 border border-gray-300 dark:border-gray-500 rounded-md bg-white dark:bg-gray-700/30">
+                                <input type="text" id="adhoc-log-student-search" placeholder="Search and add students..."
+                                       class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 mb-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <div id="adhoc-log-student-search-results" class="text-sm max-h-32 overflow-y-auto mb-2">
+                                    </div>
+                                <ul id="adhoc-log-selected-students-list" class="text-sm space-y-1">
+                                    </ul>
+                                <p id="adhoc-log-student-error" class="text-red-500 dark:text-red-400 text-xs mt-1 hidden"></p>
+                            </div>
+                        </div>
+
+                        <div id="adhoc-log-fields-container" class="space-y-3 pt-3 border-t border-purple-200 dark:border-purple-600">
+                            </div>
+
+                        <div class="flex items-center justify-between">
+                             <button id="adhoc-log-submit-btn" type="submit" class="inline-flex items-center space-x-1.5 bg-purple-500 hover:bg-purple-700 text-white font-bold py-1.5 px-3 rounded text-sm focus:outline-none focus:shadow-outline">
+                                <span>💾</span> <span>Log Ad-hoc Session</span>
+                            </button>
+                            <p id="adhoc-log-status" class="text-xs ml-3"></p>
+                        </div>
+                    </form>
+                 </div>
+                 <div class="border-t border-purple-200 dark:border-purple-600 pt-4 mt-4">
+                     <h4 class="font-medium mb-2 text-purple-800 dark:text-purple-200">Manage Student Status</h4>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                        Mark students as inactive to hide them from regular scheduling and suggestions.
+                    </p>
+                    <div class="mb-2">
+                        <label for="admin-student-filter" class="sr-only">Filter Students</label>
+                        <input type="text" id="admin-student-filter" placeholder="Filter students by name..."
+                               class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div id="admin-student-status-list-container" class="max-h-96 overflow-y-auto border border-purple-200 dark:border-purple-600 rounded bg-white dark:bg-gray-800/50 p-2">
+                        <ul id="admin-student-status-list">
+                            <li class="text-center text-gray-500 dark:text-gray-400 italic py-2">Loading students...</li>
+                        </ul>
+                    </div>
+                    <p id="admin-student-status-error" class="text-red-500 dark:text-red-400 text-xs mt-1 hidden"></p>
+                 </div>
+                 <div class="border-t border-purple-200 dark:border-purple-600 pt-4 mt-4">
+                     <h4 class="font-medium mb-2 text-purple-800 dark:text-purple-200">Find Fill-in Suggestions (Admin)</h4>
+                     <form id="admin-find-fillins-form" class="flex flex-wrap gap-4 items-end mb-3">
+                         <div>
+                             <label for="admin-coach-filter" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Coach:</label>
+                             <select id="admin-coach-filter" class="text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                                 <option value="">Any Coach</option>
+                                 </select>
+                         </div>
+                         <div>
+                             <label for="admin-day-filter" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Day:</label>
+                             <select id="admin-day-filter" class="text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                                 <option value="">Any Day</option>
+                                 <option value="Monday">Monday</option>
+                                 <option value="Tuesday">Tuesday</option>
+                                 <option value="Wednesday">Wednesday</option>
+                                 <option value="Thursday">Thursday</option>
+                                 <option value="Friday">Friday</option>
+                                 </select>
+                         </div>
+                         <div class="flex items-center">
+                             <input id="admin-include-partial" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:bg-gray-600 dark:border-gray-500">
+                             <label for="admin-include-partial" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Include Partially Full</label>
+                         </div>
+                         <button type="submit" class="inline-flex items-center space-x-1.5 bg-purple-500 hover:bg-purple-700 text-white font-bold py-1.5 px-3 rounded text-sm focus:outline-none focus:shadow-outline">
+                             <span>🔍</span> <span>Find</span>
+                         </button>
+                     </form>
+                     <div id="admin-results-area" class="max-h-80 overflow-y-auto border border-purple-200 dark:border-purple-600 rounded bg-white dark:bg-gray-800 p-2 text-sm">
+                         <p class="text-gray-500 dark:text-gray-400 italic">Use filters above to find suggestions.</p>
+                     </div>
+                 </div>
+                 <div class="border-t border-purple-200 dark:border-purple-600 pt-4 mt-4">
+                     <h4 class="font-medium mb-2 text-purple-800 dark:text-purple-200">Create Daily Block</h4>
+                     <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                         Block a specific date for holidays, year/class absences, or coach unavailability. This will automatically mark affected scheduled students as absent for that day.
+                     </p>
+                     <form id="create-daily-block-form" class="space-y-3">
+                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                             <div>
+                                 <label for="block-date" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date*</label>
+                                 <input type="date" id="block-date" name="block-date" required
+                                        class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                             </div>
+                             <div>
+                                 <label for="block-type" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Type*</label>
+                                 <select id="block-type" name="block-type" required
+                                         class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                                     <option value="">Select Type...</option>
+                                     <option value="Public Holiday">Public Holiday</option>
+                                     <option value="Year Level Absence">Year Level Absence</option>
+                                     <option value="Class Absence">Class Absence</option>
+                                     <option value="Coach Unavailable">Coach Unavailable</option>
+                                     <option value="Other">Other (Manual Absences)</option>
+                                 </select>
+                             </div>
+                         </div>
+                         <div>
+                             <label for="block-identifier" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Identifier (e.g., Year Level, Class Name, Coach ID)</label>
+                             <input type="text" id="block-identifier" name="block-identifier"
+                                    placeholder="Required for Year/Class/Coach blocks"
+                                    class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                         </div>
+                         <div>
+                             <label for="block-reason" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Reason (Optional)</label>
+                             <input type="text" id="block-reason" name="block-reason"
+                                    class="block w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500">
+                         </div>
+                         <div class="flex items-center justify-between">
+                             <button id="create-block-submit-btn" type="submit" class="inline-flex items-center space-x-1.5 bg-purple-500 hover:bg-purple-700 text-white font-bold py-1.5 px-3 rounded text-sm focus:outline-none focus:shadow-outline">
+                                 <span>🚫</span> <span>Create Block</span>
+                             </button>
+                             <p id="create-block-status" class="text-xs ml-3"></p>
+                         </div>
+                     </form>
+                 </div>
+             </div>
+        </section>
+
+    </section>
+
+    <div id="student-profile-modal">
+        <button id="modal-close-button" class="absolute top-4 right-4 z-50 bg-white/90 dark:bg-gray-700/90 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-150 shadow inline-flex items-center justify-center w-8 h-8">
+            <span class="text-lg leading-none">❌</span> </button>
+
+        <div class="p-6 pb-4 mb-4 border-b border-gray-300 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-800 z-40">
+            <h3 id="modal-student-name" class="text-2xl font-semibold text-gray-800 dark:text-gray-100 text-center">Student Profile</h3>
+        </div>
+
+        <div id="modal-content-area" class="p-6">
+            <div id="modal-student-info" class="mb-6">
+                </div>
+
+            <div class="mb-4">
+                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-3">Lesson History</h4>
+                <div id="modal-loading-indicator" class="hidden mx-auto my-4"></div> <p id="modal-error-message" class="text-red-500 dark:text-red-400 text-sm hidden mb-2"></p>
+                <div id="modal-lesson-history" class="space-y-3">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="class-view-modal">
+        <button id="class-modal-close-button">
+            <span class="text-lg leading-none">❌</span>
+        </button>
+        <div class="p-6 pb-4 mb-4 border-b border-gray-300 dark:border-gray-600 sticky top-0 bg-white dark:bg-gray-800 z-40">
+            <h3 id="class-modal-name" class="text-2xl font-semibold text-gray-800 dark:text-gray-100 text-center">Class Roster</h3>
+        </div>
+        <div class="p-6">
+            <div class="mb-6 pb-4 border-b border-gray-200 dark:border-gray-600">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-lg font-medium text-gray-700 dark:text-gray-200">Class Availability</h4>
+                    <button id="edit-class-availability-btn" class="hidden text-xs bg-blue-500 hover:bg-blue-700 text-white font-semibold py-1 px-2 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        Edit
+                    </button>
+                </div>
+                <div id="class-modal-availability-display" class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    <p class="italic text-gray-500 dark:text-gray-400">Loading availability...</p>
+                </div>
+                <div id="class-modal-availability-edit" class="hidden mt-2">
+                    <textarea id="class-modal-availability-textarea" rows="5" class="w-full text-sm border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 rounded-md shadow-sm p-1.5 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                    <div class="flex justify-end space-x-2 mt-2">
+                        <button id="cancel-class-availability-btn" type="button" class="text-xs text-gray-600 dark:text-gray-400 hover:underline">Cancel</button>
+                        <button id="save-class-availability-btn" type="button" class="text-xs bg-green-500 hover:bg-green-600 text-white font-semibold py-1 px-2 rounded">Save</button>
+                    </div>
+                    <p id="class-modal-availability-error" class="text-red-500 dark:text-red-400 text-xs mt-1 hidden"></p>
+                </div>
+            </div>
+            <h4 class="text-lg font-medium text-gray-700 dark:text-gray-200 mb-2">Students</h4>
+            <div id="class-modal-loading-indicator" class="hidden mx-auto my-4"></div>
+            <p id="class-modal-error-message" class="text-red-500 dark:text-red-400 text-sm hidden mb-2"></p>
+            <ul id="class-modal-student-list" class="space-y-1">
+                </ul>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="js/main.js"></script>
+
+</body>
+</html>
