@@ -1,0 +1,36 @@
+# Dependencies
+/node_modules
+
+# Environment variables (NEVER commit .env files with secrets)
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example # This line means: DON'T ignore .env.example
+
+# Production/build artifacts
+/build
+/dist
+/.output
+/.next
+/.svelte-kit
+/public/build # Common for some frameworks like Laravel Mix / Vite
+
+# IDE & OS files
+.vscode/
+*.code-workspace
+.idea/
+.DS_Store
+Thumbs.db
+
+# Log files
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Supabase specific (if using the CLI locally for some things)
+# supabase/.temp/
+# supabase/functions/.env # If you have local .env for edge functions with secrets
